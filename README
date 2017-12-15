@@ -53,6 +53,7 @@ The config file describes the set of processes that need to be stopped.
 The order matters only if you use exclusion rules: the rules are applies sequentially.
 
 - Empty lines and rules that start with the octothorpe `#` are comments and get ignored.
+- The characters `§$&^?.+-*@` are reserved for future use and are currently ignored.
 - Rules that start with the equals sign `=` are taken to be PIDs.
 - Rules that start with the double quotation mark `"` are taken to be process names.
   Note that there should not be a matching quotation mark, so `"firefox"` would be interpreted as the process name `firefox"`,
