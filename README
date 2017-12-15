@@ -27,13 +27,18 @@ and invoke it on session start with the path to the config file as argument.
 
 ## Run
 
-Run without arguments to use the config file `briar-rose.config` of the current working directory.
+`./briar_rose.py [--debug]  [--pidfile PATH_TO_PIDFILE] [--config PATH_TO_CONFIG_FILE]`
 
-Run with a single argument (the path to the config file) to use that instead.
+The default config file is `briar_rose.config` of the current working directory.
 
-Run with `--debug` to show how the config filie is interpreted, and what processes would get stopped.
+The default pidfile is `${XDG_RUNTIME_DIR}/briar_rose.pid`,
+or if that environment variable is not defined, then `/tmp/${USER}-briar_rose.pid`,
+or if that environment variable *also* is not defined, then just `/tmp/briar_rose.pid`.
 
-Briar Rose attempts to reload the config file every time it is about to stop processes – and *only* then.
+The option `--debug` shows how the config file would currently be interpreted, and exit immediately.
+Does not interact with the lock at all.
+
+Briar Rose attempts to load the config file on start and every time it is about to stop processes – and *only* then.
 So if you lock your screen which stops Firefox, and then uncomment the rule for Firefox,
 and then unlock the screen, then Briar Rose will still remember to wake up Firefox.
 Briar Rose will also wake up processes which it couldn't stop.
@@ -85,6 +90,7 @@ This means that any Firefox process, any process with the name `asd_sd^asd  üü
 - Integration with systemd?
 - Ability to restart?
 - Proper atexit hooks?
+- Proper `--help` and Usage message.
 
 PRs welcome!
 
