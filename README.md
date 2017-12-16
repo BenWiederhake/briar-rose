@@ -102,6 +102,10 @@ PRs welcome!
 Because it's the main protagonist of the story Sleeping Beauty.
 I do recognize that it might have been more appropriate to use the names of the witch and the prince, and combine them somehow.
 
+Other good names would have been
+partial-suspend (because it's like suspend for only some of the programs), and
+heisenberg-desktop (because the desktop is only there when you observe it).
+
 Fork it, rename it, it's MIT licensed after all.
 
 ## License
