@@ -22,8 +22,9 @@ DRY_RUN = True
 # a different screensaver.
 SS_TIME_INVOKE = ['xscreensaver-command', '-time']
 SS_WATCH_INVOKE = ['xscreensaver-command', '-watch']
-# List of tuples of `(regex, reaction)`, where `reaction` must be one of 'STOP', 'CONT', 'IGN'.
-# If none of the regexes matches, Briar Rose continues all processes and aborts.
+# List of tuples of `(regex, reaction)`, where `reaction` must be one of
+# 'STOP', 'CONT', 'IGN'.  If none of the regexes matches, Briar Rose
+# sends SIGCONT to all processes and aborts.
 SS_TIME_PARSE = [('screen non-blanked', 'CONT'),
                  ('screen blanked', 'STOP' if BLANKED_MEANS_STOP else 'CONT'),
                  ('screen locked', 'STOP')]
@@ -62,8 +63,9 @@ def get_reaction(event, ccre_list):
 
 def pidof(pname):
     # Thanks to https://stackoverflow.com/a/35938503/3070326
+    args = PIDOF_INVOKE + [pname]
     try:
-        return set(map(int, subprocess.check_output(PIDOF_INVOKE + [pname]).split()))
+        return set(map(int, subprocess.check_output(args).split()))
     except subprocess.CalledProcessError:
         return set()
 
@@ -79,23 +81,28 @@ def parse_rule(rule, err_fd, is_exception=False):
             print('WARNING: Comment exception!', file=err_fd)
         return RULE_NOOP
     if rule[0] in '§$&^?.+-*@':
-        print('WARNING: Reserved character {}.  Might be the config file of a future version!'.format(rule[0]), file=err_fd)
+        print('WARNING: Reserved character {}.  '
+              'Might be the config file of a future version!'
+              .format(rule[0]), file=err_fd)
         return RULE_NOOP
     if rule[0] == '=':
         try:
             return (not is_exception, {int(rule[1:])})
         except ValueError:
-            print('WARNING: Could not parse PID "{}"!'.format(rule[1:]), file=err_fd)
+            print('WARNING: Could not parse PID "{}"!'
+                  .format(rule[1:]), file=err_fd)
             return RULE_NOOP
     if rule[0] == '!':
         if is_exception:
-            print('WARNING: Double-exceptions are a syntax error!', file=err_fd)
+            print('WARNING: Double-exceptions are a syntax error!',
+                  file=err_fd)
             return RULE_NOOP
         return parse_rule(rule[1:], err_fd, is_exception=True)
     if rule[0] == '"':
         rule = rule[1:]
         if rule[-1] == '"':
-            print('WARNING: Rule starts and ends with quotation mark.  It is possible this line has the wrong syntax!',
+            print('WARNING: Rule starts and ends with quotation mark.  '
+                  'It is possible this line has the wrong syntax!',
                   file=err_fd)
     return (not is_exception, pidof(rule))
 
@@ -115,9 +122,11 @@ def parse_rules(rules, err_fd):
             pids.difference_update(sub_set)
         len_after = len(pids)
         if len_after > len_before:
-            print('{} PIDs added.  PID set is now {}'.format(len_after - len_before, sorted(pids)), file=err_fd)
+            print('{} PIDs added.  PID set is now {}'
+                  .format(len_after - len_before, sorted(pids)), file=err_fd)
         elif len_after < len_before:
-            print('{} PIDs removed.  PID set is now {}'.format(len_before - len_after, sorted(pids)), file=err_fd)
+            print('{} PIDs removed.  PID set is now {}'
+                  .format(len_before - len_after, sorted(pids)), file=err_fd)
         else:
             print('PID set unchanged', file=err_fd)
     print('Parsing completed.', file=err_fd)
@@ -133,7 +142,8 @@ def update_pids(config_path, err_fd):
         fd = open(config_path, 'r')
         # If you really need to stop a program of unknown pid
         # with \r or \n in its name, then you're fucked anyway.
-        new_pids = parse_rules([line.rstrip('\r\n') for line in fd.readlines()], err_fd)
+        new_pids = parse_rules([line.rstrip('\r\n')
+                                for line in fd.readlines()], err_fd)
         fd.close()  # If this leaks, the program is about to die anyway.
         LAST_PIDS = new_pids
     except OSError as e:
@@ -149,12 +159,14 @@ def send_sig_all(sig):
     for pid in LAST_PIDS:
         try:
             if DRY_RUN:
-                print('Would send {} to PID {}'.format(sig, pid), file=sys.stderr)
+                print('Would send {} to PID {}'.format(sig, pid),
+                      file=sys.stderr)
             else:
                 print('Sending {} to PID {}'.format(sig, pid), file=sys.stderr)
                 os.kill(pid, sig)
         except OSError as e:
-            print('Could not send {} to PID {}: {}'.format(sig, pid, e), file=sys.stderr)
+            print('Could not send {} to PID {}: {}'.format(sig, pid, e),
+                  file=sys.stderr)
 
 
 def execute_reaction(reaction, config_path=None):
@@ -173,32 +185,41 @@ def execute_reaction(reaction, config_path=None):
 
 def run_daemon(config_path):
     print('Booting', file=sys.stderr)
-    print('SIGSTOP={}, SIGCONT={}'.format(signal.SIGSTOP, signal.SIGCONT), file=sys.stderr)
+    print('SIGSTOP={}, SIGCONT={}'.format(signal.SIGSTOP, signal.SIGCONT),
+          file=sys.stderr)
     update_pids(config_path, sys.stderr)
     atexit.register(send_sig_all, signal.SIGCONT)
 
     # Read `xscreensaver-command -time`, react
-    reaction = get_reaction(subprocess.check_output(SS_TIME_INVOKE).decode('UTF-8'), SS_TIME_CCRE)
+    time_output = subprocess.check_output(SS_TIME_INVOKE).decode('UTF-8')
+    reaction = get_reaction(time_output, SS_TIME_CCRE)
+    del time_output
     execute_reaction(reaction)
 
     # Set up pipe from `xscreensaver-command -watch`
-    # Note: Timing race!  Sadly, there is no way to call `xscreensaver-command -watch`
-    # in a way that tells us the current state.  So we just have to hope that
-    # xscreensaver does not change state in this short timeframe.
+    # Note: Timing race!  Sadly, there is no way to call
+    # `xscreensaver-command -watch` in a way that tells us the current state.
+    # So we just have to hope that xscreensaver does not change state in this
+    # short timeframe.
     # TODO: Connect to `xscreensaver-command -watch`, run in loop
-    watch = subprocess.Popen(SS_WATCH_INVOKE, bufsize=1, universal_newlines=True, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE)
-    print('\nStarted watchdog with PID {} on {}'.format(watch.pid, datetime.now()), file=sys.stderr)
+    watch = subprocess.Popen(SS_WATCH_INVOKE,
+                             bufsize=1, universal_newlines=True,
+                             stdin=subprocess.DEVNULL, stdout=subprocess.PIPE)
+    print('\nStarted watchdog with PID {} on {}'
+          .format(watch.pid, datetime.now()), file=sys.stderr)
 
     try:
         for line in watch.stdout:
             reaction = get_reaction(line, SS_WATCH_CCRE)
-            print('\n{} triggered on {}'.format(reaction, datetime.now()), file=sys.stderr)
+            print('\n{} triggered on {}'.format(reaction, datetime.now()),
+                  file=sys.stderr)
             execute_reaction(reaction, config_path)
     except KeyboardInterrupt:
         print('\nCtrl-C on {}'.format(datetime.now()), file=sys.stderr)
         # This is the only way of achieving a zero exit-code
         exit(0)
-    print('\nWatchdog died unexpectedly on {}!'.format(datetime.now()), file=sys.stderr)
+    print('\nWatchdog died unexpectedly on {}!'.format(datetime.now()),
+          file=sys.stderr)
     exit(1)
 
 
@@ -212,7 +233,6 @@ def default_pidfile_path():
 
 def run_args(args):
     config_path = None  # Must be replaced by dynamic default value
-    #'briar-rose.config'
     pidfile_path = None  # Must be replaced by dynamic default value
     is_debug = False
 
@@ -257,8 +277,9 @@ def run_args(args):
         print('Loading configuration from {}'.format(config_path))
         run_debug(config_path)
     else:
-        with PidFile(pidname=basename(pidfile_path), piddir=dirname(pidfile_path),
-                enforce_dotpid_postfix=False):
+        with PidFile(pidname=basename(pidfile_path),
+                     piddir=dirname(pidfile_path),
+                     enforce_dotpid_postfix=False):
             run_daemon(config_path)
 
 
