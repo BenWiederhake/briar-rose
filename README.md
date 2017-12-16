@@ -86,6 +86,7 @@ and process 2543 are stopped, but not process 9876 (even if it is called "firefo
 
 ## TODOs
 
+- Commit and include a CC0 image of Briar Rose.
 - Integration with systemd?
 - Proper `--help` and Usage message.
 - Include other browsers, mail clients, electron apps, etc.
