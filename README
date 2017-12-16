@@ -75,22 +75,25 @@ The order matters only if you use exclusion rules: the rules are applies sequent
 Example:
 
     firefox
-    Web Content
     "asd_sd^asd  üüÜ↓→
     =2543
     !=9876
 
-This means that any Firefox process, any process with the name `asd_sd^asd  üüÜ↓→`, and process 2543 are stopped, but not process 9876 (even if it is a Firefox process, or that weird `asd_sd^asd  üüÜ↓→` thing.)
+This means that process called "firefox", any process with the name `asd_sd^asd  üüÜ↓→`,
+and process 2543 are stopped, but not process 9876 (even if it is called "firefox", or that weird `asd_sd^asd  üüÜ↓→` thing.)
 
 <!-- Me, in two years, on the syntax: "It seemed like a good idea at the time." -->
 
 ## TODOs
 
-- Everything
 - Integration with systemd?
-- Ability to restart?
-- Proper atexit hooks?
 - Proper `--help` and Usage message.
+- Include other browsers, mail clients, electron apps, etc.
+- Check whether it builds on other OSes, make it more portable.
+- Modularization.  Currently, if the user disagrees with a "section" of the config,
+  they have to comment out each line individually.
+- Come up with a good way to manage the logs.
+  Current solution: Run it in a terminal, read it when there are any problems.
 
 PRs welcome!
 
