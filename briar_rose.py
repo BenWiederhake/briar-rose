@@ -127,6 +127,7 @@ LAST_PIDS = {}
 
 
 def update_pids(config_path, err_fd):
+    global LAST_PIDS
     try:
         fd = open(config_path, 'r')
         # If you really need to stop a program of unknown pid
@@ -137,12 +138,10 @@ def update_pids(config_path, err_fd):
     except OSError as e:
         print('Cannot read config file: {}'.format(e), file=err_fd)
 
-    return LAST_PIDS
-
 
 def run_debug(config_path):
-    pids = load_pids(config_path, sys.stdout)
-    print('So I would stop {} pids now.'.format(len(pids)))
+    update_pids(config_path, sys.stdout)
+    print('So I would stop {} pids now.'.format(len(LAST_PIDS)))
 
 
 def send_sig_all(sig):
@@ -156,20 +155,37 @@ def send_sig_all(sig):
             print('Could not send {} to PID {}: {}'.format(sig, pid, e))
 
 
+def execute_reaction(reaction):
+    if reaction == 'IGN':
+        pass
+    elif reaction == 'STOP':
+        send_sig_all(signal.SIGSTOP)
+    elif reaction == 'CONT':
+        send_sig_all(signal.SIGCONT)
+    else:
+        print('Invalid reaction {}?!', file=sys.stderr)
+        exit(1)
+
+
 def run_daemon(config_path):
-    current_pids = update_pids(config_path, sys.stderr)
-    atexit(send_sig_all, signal.SIGCONT)
+    update_pids(config_path, sys.stderr)
+    atexit.register(send_sig_all, signal.SIGCONT)
 
     # Read `xscreensaver-command -time`, react
-    #try:
-    #    return check_output([…, pname]).split()))
-    #except subprocess.CalledProcessError:
-    #    return set()
+    reaction = get_reaction(subprocess.check_output(SS_TIME_INVOKE).decode('UTF-8'), SS_TIME_CCRE)
+    execute_reaction(reaction)
 
+    # Set up pipe from `xscreensaver-command -watch`
     # Note: Timing race!  Sadly, there is no way to call `xscreensaver-command -watch`
     # in a way that tells us the current state.  So we just have to hope that
     # xscreensaver does not change state in this short timeframe.
     # TODO: Connect to `xscreensaver-command -watch`, run in loop
+    exit(1)
+    pipe = None
+
+    while True:
+        reaction = get_reaction(pipe.get_line(), SS_WATCH_CCRE)
+        execute_reaction(reaction)
 
 
 def default_pidfile_path():
