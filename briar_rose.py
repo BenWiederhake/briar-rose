@@ -150,15 +150,18 @@ def send_sig_all(sig):
             if DRY_RUN:
                 print('Would send {} to PID {}'.format(sig, pid))
             else:
+                print('Sending {} to PID {}'.format(sig, pid))
                 os.kill(pid, sig)
         except OSError as e:
             print('Could not send {} to PID {}: {}'.format(sig, pid, e))
 
 
-def execute_reaction(reaction):
+def execute_reaction(reaction, config_path=None):
     if reaction == 'IGN':
         pass
     elif reaction == 'STOP':
+        if config_path is not None:
+            update_pids(config_path, sys.stderr)
         send_sig_all(signal.SIGSTOP)
     elif reaction == 'CONT':
         send_sig_all(signal.SIGCONT)
@@ -169,6 +172,7 @@ def execute_reaction(reaction):
 
 def run_daemon(config_path):
     update_pids(config_path, sys.stderr)
+    print('SIGSTOP={}, SIGCONT={}'.format(signal.SIGSTOP, signal.SIGCONT), file=sys.stderr)
     atexit.register(send_sig_all, signal.SIGCONT)
 
     # Read `xscreensaver-command -time`, react
@@ -180,12 +184,15 @@ def run_daemon(config_path):
     # in a way that tells us the current state.  So we just have to hope that
     # xscreensaver does not change state in this short timeframe.
     # TODO: Connect to `xscreensaver-command -watch`, run in loop
-    exit(1)
-    pipe = None
+    watch = subprocess.Popen(SS_WATCH_INVOKE, bufsize=1, universal_newlines=True, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE)
+    print('Started watchdog with PID {}'.format(watch.pid), file=sys.stderr)
 
-    while True:
-        reaction = get_reaction(pipe.get_line(), SS_WATCH_CCRE)
-        execute_reaction(reaction)
+    for line in watch.stdout:
+        reaction = get_reaction(line, SS_WATCH_CCRE)
+        print('{} triggered'.format(reaction), file=sys.stderr)
+        execute_reaction(reaction, config_path)
+    print('Watchdog died unexpectedly!', file=sys.stderr)
+    exit(1)
 
 
 def default_pidfile_path():
