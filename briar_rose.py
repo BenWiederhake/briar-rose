@@ -1,18 +1,56 @@
 #!/usr/bin/env python3
 
 from os import environ
+from os.path import basename, dirname
 import sys
 import subprocess
-#from pid import Pidfile
+from pid import PidFile
+import re
 
+
+# ===== CONFIGURATION =====
+# Just in case you disagree with some of my choices.
+
+BLANKED_MEANS_STOP = True
+PIDOF_INVOKE = ['pidof']
+
+# With these commands you probably could extend compatibility to
+# a different screensaver.
+SS_TIME_INVOKE = ['xscreensaver-command', '-time']
+SS_WATCH_INVOKE = ['xscreensaver-command', '-watch']
+# List of tuples of `(regex, reaction)`, where `reaction` must be one of 'STOP', 'CONT', 'IGN'.
+# If none of the regexes matches, Briar Rose continues all processes and aborts.
+SS_TIME_PARSE = [('screen non-blanked', 'CONT'),
+                 ('screen blanked', 'STOP' if BLANKED_MEANS_STOP else 'CONT'),
+                 ('screen locked', 'STOP')]
+SS_WATCH_PARSE = [('^LOCK ', 'STOP'),
+                  ('^BLANK ', 'STOP' if BLANKED_MEANS_STOP else 'CONT'),
+                  ('^UNBLANK ', 'CONT'),
+                  ('^RUN', 'IGN')]
+
+
+# ===== CODE =====
+# You really shouldn't need to change anything beyond here.
 
 RULE_NOOP = (True, set())
+
+
+def compile_parser(parser):
+    accu = []
+    for pattern, reaction in parser:
+        assert reaction in ['STOP', 'CONT', 'IGN'], \
+            'Pattern "{}" has invalid reaction {}!'.format(pattern, reaction)
+        accu.append((re.compile(pattern), reaction))
+
+
+SS_TIME_CCRE = compile_parser(SS_TIME_PARSE)
+SS_WATCH_PARSE = compile_parser(SS_WATCH_PARSE)
 
 
 def pidof(pname):
     # Thanks to https://stackoverflow.com/a/35938503/3070326
     try:
-        return set(map(int, subprocess.check_output(["pidof", pname]).split()))
+        return set(map(int, subprocess.check_output(PIDOF_INVOKE + [pname]).split()))
     except subprocess.CalledProcessError:
         return set()
 
@@ -38,13 +76,14 @@ def parse_rule(rule, err_fd, is_exception=False):
             return RULE_NOOP
     if rule[0] == '!':
         if is_exception:
-            print('WARNING: Double-exceptions are a syntax error!'.format(rule[1:]), file=err_fd)
+            print('WARNING: Double-exceptions are a syntax error!', file=err_fd)
             return RULE_NOOP
         return parse_rule(rule[1:], err_fd, is_exception=True)
     if rule[0] == '"':
         rule = rule[1:]
         if rule[-1] == '"':
-            print('WARNING: Rule starts and ends with quotation mark.  It is possible this line has the wrong syntax!'.format(rule[1:]), file=err_fd)
+            print('WARNING: Rule starts and ends with quotation mark.  It is possible this line has the wrong syntax!',
+                  file=err_fd)
     return (not is_exception, pidof(rule))
 
 
@@ -94,7 +133,20 @@ def run_debug(config_path):
     print('So I would stop {} pids now.'.format(len(pids)))
 
 
-# def run_daemon(config_path, pidfile_path):
+def run_daemon(config_path):
+    current_pids = load_pids(config_path, sys.stderr)
+    # Register atexit(continue_all)
+
+    # Read `xscreensaver-command -time`, react
+    #try:
+    #    return check_output([…, pname]).split()))
+    #except subprocess.CalledProcessError:
+    #    return set()
+
+    # Note: Timing race!  Sadly, there is no way to call `xscreensaver-command -watch`
+    # in a way that tells us the current state.  So we just have to hope that
+    # xscreensaver does not change state in this short timeframe.
+    # TODO: Connect to `xscreensaver-command -watch`, run in loop
 
 
 def default_pidfile_path():
@@ -152,8 +204,9 @@ def run_args(args):
         print('Loading configuration from {}'.format(config_path))
         run_debug(config_path)
     else:
-        raise NotImplementedError()
-        # run_daemon(config_path, pidfile_path)
+        with PidFile(pidname=basename(pidfile_path), piddir=dirname(pidfile_path),
+                enforce_dotpid_postfix=False):
+            run_daemon(config_path)
 
 
 if __name__ == '__main__':
