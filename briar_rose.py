@@ -8,6 +8,7 @@ from pid import PidFile
 import re
 import atexit
 import signal
+from datetime import datetime
 
 
 # ===== CONFIGURATION =====
@@ -148,12 +149,12 @@ def send_sig_all(sig):
     for pid in LAST_PIDS:
         try:
             if DRY_RUN:
-                print('Would send {} to PID {}'.format(sig, pid))
+                print('Would send {} to PID {}'.format(sig, pid), file=sys.stderr)
             else:
-                print('Sending {} to PID {}'.format(sig, pid))
+                print('Sending {} to PID {}'.format(sig, pid), file=sys.stderr)
                 os.kill(pid, sig)
         except OSError as e:
-            print('Could not send {} to PID {}: {}'.format(sig, pid, e))
+            print('Could not send {} to PID {}: {}'.format(sig, pid, e), file=sys.stderr)
 
 
 def execute_reaction(reaction, config_path=None):
@@ -185,13 +186,18 @@ def run_daemon(config_path):
     # xscreensaver does not change state in this short timeframe.
     # TODO: Connect to `xscreensaver-command -watch`, run in loop
     watch = subprocess.Popen(SS_WATCH_INVOKE, bufsize=1, universal_newlines=True, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE)
-    print('Started watchdog with PID {}'.format(watch.pid), file=sys.stderr)
+    print('\nStarted watchdog with PID {} on {}'.format(watch.pid, datetime.now()), file=sys.stderr)
 
-    for line in watch.stdout:
-        reaction = get_reaction(line, SS_WATCH_CCRE)
-        print('{} triggered'.format(reaction), file=sys.stderr)
-        execute_reaction(reaction, config_path)
-    print('Watchdog died unexpectedly!', file=sys.stderr)
+    try:
+        for line in watch.stdout:
+            reaction = get_reaction(line, SS_WATCH_CCRE)
+            print('\n{} triggered on {}'.format(reaction, datetime.now()), file=sys.stderr)
+            execute_reaction(reaction, config_path)
+    except KeyboardInterrupt:
+        print('\nCtrl-C on {}'.format(datetime.now()), file=sys.stderr)
+        # This is the only way of achieving a zero exit-code
+        exit(0)
+    print('\nWatchdog died unexpectedly on {}!'.format(datetime.now()), file=sys.stderr)
     exit(1)
 
 
@@ -204,6 +210,7 @@ def default_pidfile_path():
 
 
 def run_args(args):
+    print('Booting', file=sys.stderr)
     config_path = None  # Must be replaced by dynamic default value
     #'briar-rose.config'
     pidfile_path = None  # Must be replaced by dynamic default value
