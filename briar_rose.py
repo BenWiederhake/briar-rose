@@ -185,6 +185,10 @@ def execute_reaction(reaction, config_path=None):
 
 def run_daemon(config_path):
     print('Booting', file=sys.stderr)
+    if DRY_RUN:
+        print('IN DRY RUN MODE!  '
+              'To change this, change the constant DRY_RUN to false!',
+              file=sys.stderr)
     print('SIGSTOP={}, SIGCONT={}'.format(signal.SIGSTOP, signal.SIGCONT),
           file=sys.stderr)
     update_pids(config_path, sys.stderr)
