@@ -142,7 +142,7 @@ def update_pids(config_path, err_fd):
 
 def run_debug(config_path):
     update_pids(config_path, sys.stdout)
-    print('So I would stop {} pids now.'.format(len(LAST_PIDS)))
+    print('So I would watch over {} pids currently.'.format(len(LAST_PIDS)))
 
 
 def send_sig_all(sig):
@@ -172,8 +172,9 @@ def execute_reaction(reaction, config_path=None):
 
 
 def run_daemon(config_path):
-    update_pids(config_path, sys.stderr)
+    print('Booting', file=sys.stderr)
     print('SIGSTOP={}, SIGCONT={}'.format(signal.SIGSTOP, signal.SIGCONT), file=sys.stderr)
+    update_pids(config_path, sys.stderr)
     atexit.register(send_sig_all, signal.SIGCONT)
 
     # Read `xscreensaver-command -time`, react
@@ -210,7 +211,6 @@ def default_pidfile_path():
 
 
 def run_args(args):
-    print('Booting', file=sys.stderr)
     config_path = None  # Must be replaced by dynamic default value
     #'briar-rose.config'
     pidfile_path = None  # Must be replaced by dynamic default value
