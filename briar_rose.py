@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 
-from os import environ
+import os
 from os.path import basename, dirname
 import sys
 import subprocess
 from pid import PidFile
 import re
+import atexit
+import signal
 
 
 # ===== CONFIGURATION =====
@@ -13,6 +15,7 @@ import re
 
 BLANKED_MEANS_STOP = True
 PIDOF_INVOKE = ['pidof']
+DRY_RUN = True
 
 # With these commands you probably could extend compatibility to
 # a different screensaver.
@@ -41,10 +44,19 @@ def compile_parser(parser):
         assert reaction in ['STOP', 'CONT', 'IGN'], \
             'Pattern "{}" has invalid reaction {}!'.format(pattern, reaction)
         accu.append((re.compile(pattern), reaction))
+    return accu
 
 
 SS_TIME_CCRE = compile_parser(SS_TIME_PARSE)
-SS_WATCH_PARSE = compile_parser(SS_WATCH_PARSE)
+SS_WATCH_CCRE = compile_parser(SS_WATCH_PARSE)
+
+
+def get_reaction(event, ccre_list):
+    for ccre, reaction in ccre_list:
+        if ccre.search(event):
+            return reaction
+    print('Unexpected event "{}"\nAbort!'.format(event))
+    exit(1)
 
 
 def pidof(pname):
@@ -114,7 +126,7 @@ def parse_rules(rules, err_fd):
 LAST_PIDS = {}
 
 
-def load_pids(config_path, err_fd):
+def update_pids(config_path, err_fd):
     try:
         fd = open(config_path, 'r')
         # If you really need to stop a program of unknown pid
@@ -133,9 +145,20 @@ def run_debug(config_path):
     print('So I would stop {} pids now.'.format(len(pids)))
 
 
+def send_sig_all(sig):
+    for pid in LAST_PIDS:
+        try:
+            if DRY_RUN:
+                print('Would send {} to PID {}'.format(sig, pid))
+            else:
+                os.kill(pid, sig)
+        except OSError as e:
+            print('Could not send {} to PID {}: {}'.format(sig, pid, e))
+
+
 def run_daemon(config_path):
-    current_pids = load_pids(config_path, sys.stderr)
-    # Register atexit(continue_all)
+    current_pids = update_pids(config_path, sys.stderr)
+    atexit(send_sig_all, signal.SIGCONT)
 
     # Read `xscreensaver-command -time`, react
     #try:
@@ -150,10 +173,10 @@ def run_daemon(config_path):
 
 
 def default_pidfile_path():
-    if 'XDG_RUNTIME_DIR' in environ:
-        return '{}/briar_rose.pid'.format(environ['XDG_RUNTIME_DIR'])
-    if 'USER' in environ:
-        return '/tmp/{}-briar_rose.pid'.format(environ['USER'])
+    if 'XDG_RUNTIME_DIR' in os.environ:
+        return '{}/briar_rose.pid'.format(os.environ['XDG_RUNTIME_DIR'])
+    if 'USER' in os.environ:
+        return '/tmp/{}-briar_rose.pid'.format(os.environ['USER'])
     return '/tmp/briar_rose.pid'
 
 
