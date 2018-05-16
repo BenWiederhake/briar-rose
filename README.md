@@ -95,6 +95,7 @@ and process 2543 are stopped, but not process 9876 (even if it is called "firefo
   they have to comment out each line individually.
 - Come up with a good way to manage the logs.
   Current solution: Run it in a terminal, read it when there are any problems.
+- Delayed stopping.
 
 PRs welcome!
 
